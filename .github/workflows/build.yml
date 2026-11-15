@@ -59,3 +59,4 @@ jobs:
           name: VXStream-Xbox360
           path: build/VXStream.xex
           if-no-files-found: error
+          
