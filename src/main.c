@@ -17,27 +17,42 @@ enum {
     VX_CLEAR_ARGB = 0xFF07111Fu
 };
 
-static void change_page(VxUiState *ui, const INPUT_GAMEPAD *pad, uint16_t previous_buttons)
+static void handle_input(VxUiState *ui, const INPUT_GAMEPAD *pad,
+                         uint16_t previous_buttons)
 {
-    const uint16_t pressed = (uint16_t)(pad->buttons & (uint16_t)~previous_buttons);
+    const uint16_t pressed =
+        (uint16_t)(pad->buttons & (uint16_t)~previous_buttons);
+
+    /* Language can be changed from the menu or any opened page. */
+    if (pressed & (INPUT_GAMEPAD_LEFT_SHOULDER | INPUT_GAMEPAD_RIGHT_SHOULDER))
+        ui->language = ui->language == VX_LANG_PT ? VX_LANG_EN : VX_LANG_PT;
+
+    if (ui->page_open) {
+        /* B returns from the selected section to the home menu. */
+        if (pressed & INPUT_GAMEPAD_B) {
+            ui->page_open = false;
+            ui->page = VX_PAGE_HOME;
+        }
+        return;
+    }
 
     if (pressed & INPUT_GAMEPAD_DPAD_UP) {
-        if (ui->page == VX_PAGE_HOME)
-            ui->page = VX_PAGE_SETTINGS;
-        else
-            ui->page = (VxPage)(ui->page - 1);
+        ui->page = ui->page == VX_PAGE_HOME
+            ? (VxPage)(VX_PAGE_COUNT - 1)
+            : (VxPage)(ui->page - 1);
     } else if (pressed & INPUT_GAMEPAD_DPAD_DOWN) {
         ui->page = (VxPage)(((unsigned)ui->page + 1u) % VX_PAGE_COUNT);
     }
 
-    if (pressed & (INPUT_GAMEPAD_LEFT_SHOULDER | INPUT_GAMEPAD_RIGHT_SHOULDER))
-        ui->language = ui->language == VX_LANG_PT ? VX_LANG_EN : VX_LANG_PT;
+    /* A opens the highlighted section. */
+    if (pressed & INPUT_GAMEPAD_A)
+        ui->page_open = true;
 }
 
 int main(void)
 {
-    VxUiState ui = { VX_LANG_PT, VX_PAGE_HOME, 0 };
-    xsdk_log_write("VX Stream: starting interface shell");
+    VxUiState ui = { VX_LANG_PT, VX_PAGE_HOME, 0, false };
+    xsdk_log_write("VX Stream: starting interface");
     uint16_t previous_buttons = 0;
 
     NTSTATUS status = xsdk_splash_show(VX_SPLASH_MS);
@@ -77,7 +92,7 @@ int main(void)
         if (input.gamepad.buttons & INPUT_GAMEPAD_BACK)
             break;
 
-        change_page(&ui, &input.gamepad, previous_buttons);
+        handle_input(&ui, &input.gamepad, previous_buttons);
         previous_buttons = input.gamepad.buttons;
 
         uint32_t address = 0;
