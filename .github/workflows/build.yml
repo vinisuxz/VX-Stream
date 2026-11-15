@@ -1,0 +1,61 @@
+name: Build VX Stream
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Xbox 360 XEX
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout VX Stream
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bison flex texinfo \
+            libgmp-dev libmpfr-dev libmpc-dev curl xz-utils patch \
+            python3 cmake ninja-build git
+
+      - name: Checkout XSDK
+        uses: actions/checkout@v4
+        with:
+          repository: xenosworks/xsdk
+          path: xsdk
+
+      - name: Build XSDK toolchain
+        env:
+          PREFIX: ${{ github.workspace }}/xsdk-gcc
+          WORK: ${{ runner.temp }}/xsdk-gcc-work
+          JOBS: "2"
+        run: bash xsdk/tools/toolchain/build.sh
+
+      - name: Build XSDK libraries
+        env:
+          TOOLCHAIN: ${{ github.workspace }}/xsdk-gcc/bin/powerpc-xsdk-elf-
+        run: make -C xsdk -j2
+
+      - name: Configure VX Stream
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/xsdk/cmake/xsdk.cmake" \
+            -DXSDK_TOOLCHAIN="$GITHUB_WORKSPACE/xsdk-gcc" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compile VXStream.xex
+        run: cmake --build build
+
+      - name: Upload XEX
+        uses: actions/upload-artifact@v4
+        with:
+          name: VXStream-Xbox360
+          path: build/VXStream.xex
+          if-no-files-found: error
