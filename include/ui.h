@@ -1,6 +1,7 @@
 #ifndef VXSTREAM_UI_H
 #define VXSTREAM_UI_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {
@@ -22,6 +23,7 @@ typedef struct {
     VxLanguage language;
     VxPage page;
     unsigned selected;
+    bool page_open;
 } VxUiState;
 
 void vx_ui_draw(const VxUiState *state, uint32_t width, uint32_t height);
